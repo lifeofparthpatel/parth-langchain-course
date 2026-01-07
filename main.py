@@ -40,10 +40,10 @@ load_dotenv()
 # LLM Configuration
 # =========================
 llm = ChatOpenAI(
-    model="gpt-4o-mini",
+    model="gpt-4",
     temperature=0
 )
-
+structured_llm = llm.with_structured_output(AgentResponse)
 # =========================
 # Tools Configuration
 # =========================
@@ -53,9 +53,9 @@ tools = [TavilySearch()]
 # =========================
 # Output Parser (Structured Output)
 # =========================
-output_parser = PydanticOutputParser(
-    pydantic_object=AgentResponse
-)
+# output_parser = PydanticOutputParser(
+#     pydantic_object=AgentResponse
+# )
 
 # =========================
 # ReAct Prompt with Format Instructions
@@ -70,7 +70,7 @@ react_prompt_with_instructions = PromptTemplate(
         "agent_scratchpad"
     ],
 ).partial(
-    format_instructions=output_parser.get_format_instructions()
+    format_instructions=""
 )
 
 # =========================
@@ -95,9 +95,9 @@ agent_executor = AgentExecutor.from_agent_and_tools(
 extract_output = RunnableLambda(
     lambda x: x["output"]
 )
-parse_output = RunnableLambda(lambda x: output_parser.parse(x))
+# parse_output = RunnableLambda(lambda x: output_parser.parse(x))
 # Alias for clarity
-chain = agent_executor | extract_output | parse_output
+chain = agent_executor | extract_output | structured_llm
 
 # =========================
 # (Alternative Modern Agent — NOT USED)
