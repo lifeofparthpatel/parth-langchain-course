@@ -40,10 +40,10 @@ load_dotenv()
 # LLM Configuration
 # =========================
 llm = ChatOpenAI(
-    model="gpt-4",
+    model="gpt-5-mini",
     temperature=0
 )
-structured_llm = llm.with_structured_output(AgentResponse)
+# structured_llm = llm.with_structured_output(AgentResponse)
 # =========================
 # Tools Configuration
 # =========================
@@ -60,53 +60,53 @@ tools = [TavilySearch()]
 # =========================
 # ReAct Prompt with Format Instructions
 # =========================
-react_prompt_with_instructions = PromptTemplate(
-    template=REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS,
-    input_variables=[
-        "input",
-        "tools",
-        "tool_names",
-        "format_instructions",
-        "agent_scratchpad"
-    ],
-).partial(
-    format_instructions=""
-)
+# react_prompt_with_instructions = PromptTemplate(
+#     template=REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS,
+#     input_variables=[
+#         "input",
+#         "tools",
+#         "tool_names",
+#         "format_instructions",
+#         "agent_scratchpad"
+#     ],
+# ).partial(
+#     format_instructions=""
+# )
 
 # =========================
 # Agent Creation (ReAct)
 # =========================
-agent = create_react_agent(
-    llm=llm,
-    tools=tools,
-    prompt=react_prompt_with_instructions
-)
+# agent = create_react_agent(
+#     llm=llm,
+#     tools=tools,
+#     prompt=react_prompt_with_instructions
+# )
 
 # =========================
 # Agent Executor
 # =========================
-agent_executor = AgentExecutor.from_agent_and_tools(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    handle_parsing_errors=True
-)
+# agent_executor = AgentExecutor.from_agent_and_tools(
+#     agent=agent,
+#     tools=tools,
+#     verbose=True,
+#     handle_parsing_errors=True
+# )
 
-extract_output = RunnableLambda(
-    lambda x: x["output"]
-)
+# extract_output = RunnableLambda(
+#     lambda x: x["output"]
+# )
 # parse_output = RunnableLambda(lambda x: output_parser.parse(x))
 # Alias for clarity
-chain = agent_executor | extract_output | structured_llm
+# chain = agent_executor | extract_output | structured_llm
 
 # =========================
 # (Alternative Modern Agent — NOT USED)
 # =========================
-# agent = create_agent(
-#     model=llm,
-#     tools=tools,
-#     response_format=AgentResponse
-# )
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    response_format=AgentResponse
+)
 
 
 # =========================
@@ -116,28 +116,29 @@ def main():
     print("Hello from parth-langchain-course!")
 
     # Example direct agent invocation (commented)
-    # result = agent.invoke(
-    #     {
-    #         "messages": HumanMessage(
-    #             content=(
-    #                 "Search for 3 job posting for AI engineer using LangChain "
-    #                 "in Ahmedabad, Gujarat, India on Naukri and list their details."
-    #             )
+    result = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details",
+                }
+            ]
+        }
+    )
+
+    # ReAct Agent Execution
+    # result = chain.invoke(
+    #     input={
+    #         "input": (
+    #             "Search for 3 job posting for AI engineer using LangChain "
+    #             "in Ahmedabad, Gujarat, India on Naukri and list their details."
     #         )
     #     }
     # )
 
-    # ReAct Agent Execution
-    result = chain.invoke(
-        input={
-            "input": (
-                "Search for 3 job posting for AI engineer using LangChain "
-                "in Ahmedabad, Gujarat, India on Naukri and list their details."
-            )
-        }
-    )
-
-    print("Agent Result:", result)
+    structured = result.get("structured_response", None)
+    print(structured if structured is not None else result)
 
 
 # =========================
