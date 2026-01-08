@@ -16,6 +16,8 @@ from langchain_classic.agents.react.agent import create_react_agent
 from langsmith import Client
 from prompt import REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS
 from schemas import AgentResponse, JobPosting
+from langchain_core.tools.render import render_text_description
+from langchain_classic.agents.output_parsers import ReActSingleInputOutputParser  
 
 # =========================
 # Environment Setup
@@ -23,124 +25,56 @@ from schemas import AgentResponse, JobPosting
 load_dotenv()
 
 # =========================
-# (Optional) Tavily Client
+# Tool Definitions
 # =========================
-# tavily = TavilyClient(api_key=os.getenv('TAVILY_API_KEY'))
+@tool
+def get_text_length(text: str) -> int:
+    """Returns the length of a text by characters"""
+    print(f"get_text_length enter with {text=}")
+    text = text.strip("'\n").strip(
+        '"'
+    )  # stripping away non alphabetic characters just in case
 
-# =========================
-# (Optional) Custom Tool
-# =========================
-# @tool(description="Search for job information of a given city")
-# def search_tool(query: str) -> str:
-#     print(f'Searching for: {query}')
-#     return tavily.search(query=query)
-
-
-# =========================
-# LLM Configuration
-# =========================
-llm = ChatOpenAI(
-    model="gpt-5-mini",
-    temperature=0
-)
-# structured_llm = llm.with_structured_output(AgentResponse)
-# =========================
-# Tools Configuration
-# =========================
-# tools = [search_tool]
-tools = [TavilySearch()]
-
-# =========================
-# Output Parser (Structured Output)
-# =========================
-# output_parser = PydanticOutputParser(
-#     pydantic_object=AgentResponse
-# )
-
-# =========================
-# ReAct Prompt with Format Instructions
-# =========================
-# react_prompt_with_instructions = PromptTemplate(
-#     template=REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS,
-#     input_variables=[
-#         "input",
-#         "tools",
-#         "tool_names",
-#         "format_instructions",
-#         "agent_scratchpad"
-#     ],
-# ).partial(
-#     format_instructions=""
-# )
-
-# =========================
-# Agent Creation (ReAct)
-# =========================
-# agent = create_react_agent(
-#     llm=llm,
-#     tools=tools,
-#     prompt=react_prompt_with_instructions
-# )
-
-# =========================
-# Agent Executor
-# =========================
-# agent_executor = AgentExecutor.from_agent_and_tools(
-#     agent=agent,
-#     tools=tools,
-#     verbose=True,
-#     handle_parsing_errors=True
-# )
-
-# extract_output = RunnableLambda(
-#     lambda x: x["output"]
-# )
-# parse_output = RunnableLambda(lambda x: output_parser.parse(x))
-# Alias for clarity
-# chain = agent_executor | extract_output | structured_llm
-
-# =========================
-# (Alternative Modern Agent — NOT USED)
-# =========================
-agent = create_agent(
-    model=llm,
-    tools=tools,
-    response_format=AgentResponse
-)
+    return len(text)
 
 
 # =========================
 # Main Entry Point
 # =========================
 def main():
-    print("Hello from parth-langchain-course!")
+    print("Starting the job posting agent...")
+    tools = [get_text_length]
+    template = """
+    Answer the following questions as best you can. You have access to the following tools:
 
-    # Example direct agent invocation (commented)
-    result = agent.invoke(
-        {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details",
-                }
-            ]
-        }
+    {tools}
+
+    Use the following format:
+
+    Question: the input question you must answer
+    Thought: you should always think about what to do
+    Action: the action to take, should be one of [{tool_names}]
+    Action Input: the input to the action
+    Observation: the result of the action
+    ... (this Thought/Action/Action Input/Observation can repeat N times)
+    Thought: I now know the final answer
+    Final Answer: the final answer to the original input question
+
+    Begin!
+
+    Question: {input}
+    Thought:
+    """
+
+    prompt = PromptTemplate.from_template(template=template).partial(
+        tools= render_text_description(tools),
+        tool_names=", ".join([tool.name for tool in tools]),
     )
 
-    # ReAct Agent Execution
-    # result = chain.invoke(
-    #     input={
-    #         "input": (
-    #             "Search for 3 job posting for AI engineer using LangChain "
-    #             "in Ahmedabad, Gujarat, India on Naukri and list their details."
-    #         )
-    #     }
-    # )
-
-    structured = result.get("structured_response", None)
-    print(structured if structured is not None else result)
-
-
+    llm = ChatOpenAI(model="gpt-4", temperature=0, model_kwargs={"stop": ["\nObervation", "Observation", "Observation:"]})
+    agent = {"input": lambda x:x["input"]} | prompt | llm | ReActSingleInputOutputParser()
+    response = agent.invoke({"input": "What is the length of the following: 'Hello, world!'"})
+    print("Agent response:", response)
 # =========================
 # Script Execution Guard
 # =========================
