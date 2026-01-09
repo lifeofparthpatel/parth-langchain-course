@@ -1,19 +1,22 @@
 import os
-from typing import List
 from dotenv import load_dotenv
+
 from load_doc import load_resume
 from chunk_doc import chunk_document
 from embed_doc import store_documents
+
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 # =========================
 # Environment Setup
 # =========================
-load_dotenv()  # Load OPENAI_API_KEY from .env
+load_dotenv()
 
 # =========================
-# Job Description (Query)
+# Job Description
 # =========================
 JOB_DESCRIPTION = """
 Position: Senior Python Developer (AI Integration)
@@ -48,64 +51,60 @@ Answer:
 """)
 
 # =========================
-# Helper: Format Documents
+# Helper
 # =========================
 def format_documents(docs) -> str:
-    """
-    Convert retrieved LangChain Documents into a single text block
-    for the LLM prompt context.
-    """
     return "\n\n".join(doc.page_content for doc in docs)
 
 # =========================
-# Main Application Logic
+# Main
 # =========================
 def main():
     print("🚀 Starting the job posting agent...")
 
     # ---- Load Resume ----
     resume_docs = load_resume("PARTH PATEL.pdf")
-    print(f"📄 Loaded {len(resume_docs)} document(s) from resume.")
+    print(f"📄 Loaded {len(resume_docs)} document(s).")
 
-    # ---- Chunk Resume ----
+    # ---- Chunk ----
     chunks = chunk_document(resume_docs)
-    print(f"✂️ Chunked resume into {len(chunks)} pieces.")
+    print(f"✂️ Chunked into {len(chunks)} pieces.")
 
-    # ---- Store in Vector Store ----
+    # ---- Vector Store ----
     vector_store = store_documents(chunks)
-    print("📦 Stored resume chunks in vector store.")
+    print("📦 Stored in vector store.")
 
-    # ---- Create Retriever ----
-    retriever = vector_store.as_retriever(
-        search_kwargs={"k": 3}
-    )
+    # ---- Retriever ----
+    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-    # ---- Retrieve Relevant Context ----
-    retrieved_docs = retriever.invoke(JOB_DESCRIPTION)
-    context = format_documents(retrieved_docs)
-    print("🔍 Retrieved relevant resume context.")
-
-    # ---- Build Prompt ----
-    prompt_message = PROMPT.format_prompt(
-        context=context,
-        question='Is the candidate a good fit for this role?'
-    )
-
-    # ---- Initialize LLM ----
+    # ---- LLM ----
     llm = ChatOpenAI(
         model="gpt-5-mini",
         temperature=0,
-        openai_api_key=os.getenv("OPENAI_API_KEY")
+        api_key=os.getenv("OPENAI_API_KEY")
     )
 
-    # ---- Generate Response ----
-    response = llm.invoke(prompt_message)
-    print("🧠 Generated response from LLM:\n")
-    print(response.content)
+    # ---- Chain (THIS IS THE KEY PART) ----
+    rag_chain = (
+        {
+            "context": retriever | format_documents,
+            "question": RunnablePassthrough()
+        }
+        | PROMPT
+        | llm
+        | StrOutputParser()
+    )
 
+    # ---- Invoke ----
+    result = rag_chain.invoke(
+        "Is the candidate a good fit for this role?"
+    )
+
+    print("\n🧠 LLM Response:\n")
+    print(result)
 
 # =========================
-# Script Entry Point
+# Entry Point
 # =========================
 if __name__ == "__main__":
-    main()
+    main() 
