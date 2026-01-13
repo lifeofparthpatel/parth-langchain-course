@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ResumeSense</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+  <h1>ResumeSense</h1>
+
+  <!-- Upload PDFs -->
+  <input type="file" id="resumes" multiple accept=".pdf">
+
+  <!-- Job Description -->
+  <textarea id="jobDesc" placeholder="Paste job description here..."></textarea>
+
+  <!-- Action -->
+  <button onclick="submitData()">Parse</button>
+
+  <!-- Results -->
+  <div id="results"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
